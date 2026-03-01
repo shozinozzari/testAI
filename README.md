@@ -4,7 +4,7 @@
 - Node.js (v18+)
 - Python (v3.10+)
 - Firebase Project Credentials
-
+--
 ## 1. Backend Setup
 1. Navigate to `backend/`
 2. Create a virtual environment: `python -m venv venv`
