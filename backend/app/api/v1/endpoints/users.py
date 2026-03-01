@@ -15,7 +15,7 @@ class ProfileUpdate(BaseModel):
     category: str
     team_size: str
     acquisition_source: str
-    business_description: str
+    business_description: str = ""
 
 @router.post("/me/profile")
 async def update_profile(profile: ProfileUpdate):

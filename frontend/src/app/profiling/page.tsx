@@ -9,7 +9,8 @@ export default function ProfilingPage() {
     const [formData, setFormData] = useState({
         category: "",
         teamSize: "",
-        acquisitionSource: ""
+        acquisitionSource: "",
+        businessDescription: ""
     });
     const [loading, setLoading] = useState(false);
 
@@ -47,7 +48,8 @@ export default function ProfilingPage() {
                     uid: user.uid,
                     category: formData.category,
                     team_size: formData.teamSize,
-                    acquisition_source: formData.acquisitionSource
+                    acquisition_source: formData.acquisitionSource,
+                    business_description: formData.businessDescription
                 })
             });
 
@@ -131,6 +133,18 @@ export default function ProfilingPage() {
                             <option value="ad">Advertisement</option>
                             <option value="other">Other</option>
                         </select>
+                    </div>
+
+                    {/* Business Description */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Business Description</label>
+                        <textarea
+                            className="w-full bg-black border border-white/20 rounded-lg p-3 text-white focus:border-purple-500 outline-none min-h-24"
+                            value={formData.businessDescription}
+                            onChange={(e) => setFormData({ ...formData, businessDescription: e.target.value })}
+                            placeholder="What do you sell and who do you help?"
+                            required
+                        />
                     </div>
 
                     <button
