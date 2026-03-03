@@ -5,9 +5,9 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies (for cv2/ffmpeg if needed later)
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     ffmpeg libsm6 libxext6 \
-#     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libsm6 libxext6 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
