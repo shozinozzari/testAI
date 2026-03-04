@@ -5,9 +5,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Video Funnel"
     API_V1_STR: str = "/api/v1"
     FIREBASE_CREDENTIALS_PATH: str = "firebase_credentials.json"
-    
     # Integrations
-    GOOGLE_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""        # single key (backward compat)
+    GOOGLE_API_KEYS: str = ""       # comma-separated keys for rotation
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     RAZORPAY_KEY_ID: str = ""

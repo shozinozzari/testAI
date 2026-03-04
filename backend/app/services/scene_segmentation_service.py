@@ -1,68 +1,101 @@
 import google.generativeai as genai
-from app.core.config import settings
+from app.core.key_manager import key_manager
 import json
-import time
+import asyncio
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+def _build_model(api_key: str):
+    """Configure the old SDK and return a GenerativeModel for the given key."""
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        "gemini-2.5-flash",
+        generation_config={
+            "temperature": 0.2
+        },
+    )
+
+
 class SceneSegmentationService:
     def __init__(self):
-        self.api_key = settings.GOOGLE_API_KEY
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(
-                "gemini-2.5-flash",
-                generation_config={
-                    "temperature": 0.2
-                },
-            )
-        else:
-            logger.warning("GOOGLE_API_KEY missing. Scene segmentation disabled.")
-            self.model = None
+        if not key_manager.has_keys:
+            logger.warning("No GOOGLE API keys configured. Scene segmentation disabled.")
+
+    def _get_model(self):
+        """Get a model configured with the current active API key."""
+        key = key_manager.get_key()
+        if not key:
+            return None, None
+        return _build_model(key), key
 
     async def analyze_audio(self, audio_path: str) -> list:
         """
         Analyze audio file and return scene segments with stock footage recommendations.
+        Uses key rotation: if the current key is exhausted, rotates and retries.
         """
-        if not self.model:
-            logger.error("Scene segmentation unavailable: No API key")
+        if not key_manager.has_keys:
+            logger.error("Scene segmentation unavailable: No API keys")
             return []
 
         if not os.path.exists(audio_path):
             logger.error(f"Audio file not found: {audio_path}")
             return []
 
-        try:
-            logger.info(f"Uploading audio for scene segmentation: {audio_path}")
-            
-            # Upload the audio file to Gemini
-            audio_file = genai.upload_file(path=audio_path)
-            logger.info(f"File uploaded: {audio_file.name}. State: {audio_file.state.name}")
-            
-            # Poll for processing completion
-            max_wait = 60  # Max 60 seconds
-            waited = 0
-            while audio_file.state.name == "PROCESSING" and waited < max_wait:
-                time.sleep(2)
-                waited += 2
-                audio_file = genai.get_file(audio_file.name)
-                
-            if audio_file.state.name == "FAILED":
-                logger.error("Audio processing failed in Gemini")
+        # Try with key rotation
+        max_key_attempts = key_manager.total_keys + 1
+        for attempt in range(max_key_attempts):
+            model, key = self._get_model()
+            if not model:
+                logger.error("No available API keys for scene segmentation.")
                 return []
 
-            if audio_file.state.name == "PROCESSING":
-                logger.error("Audio processing timed out")
-                genai.delete_file(audio_file.name)
-                return []
+            try:
+                return await self._do_analyze(model, key, audio_path)
+            except Exception as e:
+                if key_manager.is_quota_error(e):
+                    key_manager.mark_exhausted(key)
+                    logger.warning(f"Scene segmentation: key exhausted, rotating... (attempt {attempt+1})")
+                    continue
+                else:
+                    logger.error(f"Scene segmentation error: {e}", exc_info=True)
+                    return []
 
-            logger.info("Audio processed. Generating scene segmentation...")
+        logger.error("All API keys exhausted for scene segmentation.")
+        return []
 
-            # Prompt for scene segmentation and stock footage recommendation
-            prompt = """
+    async def _do_analyze(self, model, key: str, audio_path: str) -> list:
+        """Perform the actual audio analysis with the given model/key."""
+        logger.info(f"Uploading audio for scene segmentation: {audio_path}")
+
+        # Upload the audio file to Gemini (blocking – run in thread)
+        # Need to reconfigure genai for this specific key before upload
+        genai.configure(api_key=key)
+        audio_file = await asyncio.to_thread(genai.upload_file, audio_path)
+        logger.info(f"File uploaded: {audio_file.name}. State: {audio_file.state.name}")
+
+        # Poll for processing completion
+        max_wait = 120
+        waited = 0
+        while audio_file.state.name == "PROCESSING" and waited < max_wait:
+            await asyncio.sleep(3)
+            waited += 3
+            audio_file = await asyncio.to_thread(genai.get_file, audio_file.name)
+
+        if audio_file.state.name == "FAILED":
+            logger.error("Audio processing failed in Gemini")
+            return []
+
+        if audio_file.state.name == "PROCESSING":
+            logger.error("Audio processing timed out after %ss", max_wait)
+            await asyncio.to_thread(genai.delete_file, audio_file.name)
+            return []
+
+        logger.info("Audio processed. Generating scene segmentation...")
+
+        prompt = """
             Role: You are a senior video editor and stock-footage researcher.
 
             Task:
@@ -95,35 +128,29 @@ class SceneSegmentationService:
               }
             ]
             """
-            
-            response = self.model.generate_content([prompt, audio_file])
-            
-            # Process the response
-            try:
-                text = response.text.strip()
-                # Clean up potential markdown formatting
-                if "```json" in text:
-                    text = text.split("```json")[1].split("```")[0]
-                elif "```" in text:
-                    text = text.split("```")[1].split("```")[0]
-                
-                segments = json.loads(text.strip())
-                logger.info(f"Generated {len(segments)} scene segments")
-                
-                # Cleanup: Delete the file from Gemini
-                genai.delete_file(audio_file.name)
-                logger.info("Cleaned up audio file from Gemini storage")
-                
-                return segments
-                
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing JSON response: {e}")
-                logger.error(f"Raw response: {response.text}")
-                genai.delete_file(audio_file.name)
-                return []
 
-        except Exception as e:
-            logger.error(f"Scene segmentation error: {e}")
+        response = await asyncio.to_thread(model.generate_content, [prompt, audio_file])
+
+        try:
+            text = response.text.strip()
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0]
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0]
+
+            segments = json.loads(text.strip())
+            logger.info(f"Generated {len(segments)} scene segments")
+
+            # Cleanup
+            await asyncio.to_thread(genai.delete_file, audio_file.name)
+            logger.info("Cleaned up audio file from Gemini storage")
+
+            return segments
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON response: {e}")
+            logger.error(f"Raw response: {response.text}")
+            await asyncio.to_thread(genai.delete_file, audio_file.name)
             return []
 
 

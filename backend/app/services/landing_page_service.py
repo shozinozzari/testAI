@@ -49,9 +49,9 @@ class LandingPageService:
                 return [val.strip()]
             return []
 
-        # Retry logic: Keep trying until we get valid content (up to ~60s)
+        # Retry logic: try a few times with back-off (free tier = 20 req/day for gemini-2.5-flash)
         ai_content = {}
-        MAX_RETRIES = 30
+        MAX_RETRIES = 3
         attempt = 0
 
         # 1) Generate VSL first so landing copy can align with it.
@@ -73,20 +73,21 @@ class LandingPageService:
                     vsl_script=vsl_script,
                 )
                 
-                # Check for valid headline AND ensure list fields aren't just strings (double check)
+                # Check for valid headline
                 headline = ai_content.get("headline")
                 if headline and headline != "Placeholder headline":
-                    # Extra check: Trust signals should be list-ish or sanitize-able
-                    # The sanitize function handles string->list, so we mainly care about headline existence.
                     break
                 
-                logger.info(f"Attempt {attempt+1}: AI generation in progress... Waiting...")
-                await asyncio.sleep(2)
+                logger.info(f"Attempt {attempt+1}: AI returned incomplete content, retrying...")
             except Exception as e:
                 logger.error(f"Attempt {attempt+1} error: {e}")
-                await asyncio.sleep(2)
             
             attempt += 1
+            if attempt < MAX_RETRIES:
+                # Back off longer each retry to respect rate limits
+                wait_time = 15 * attempt  # 15s, 30s
+                logger.info(f"Waiting {wait_time}s before retry...")
+                await asyncio.sleep(wait_time)
 
         final_content = {
             "headline": ai_content.get("headline", ""),
@@ -124,6 +125,7 @@ class LandingPageService:
         scene_segments = []
         vsl_url = ""
         if vsl_script and vsl_script.strip():
+            # --- Step 1: TTS audio generation ---
             try:
                 from app.services.audio_service import audio_service
                 logger.info(f"Starting TTS generation with voice: {anchor_voice}")
@@ -133,26 +135,34 @@ class LandingPageService:
                     campaign_id=campaign_id
                 )
                 logger.info(f"TTS audio URL: {vsl_audio_url}")
-                
-                # Generate scene segmentation from the audio
-                if vsl_audio_url:
-                    try:
-                        from app.services.scene_segmentation_service import scene_segmentation_service
-                        import os
-                        # Get the absolute path of the audio file
-                        audio_path = os.path.join(
-                            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                            vsl_audio_url.lstrip("/")
-                        )
-                        logger.info(f"Starting scene segmentation for: {audio_path}")
-                        scene_segments = await scene_segmentation_service.analyze_audio(audio_path)
-                        logger.info(f"Generated {len(scene_segments)} scene segments")
-                    except Exception as e:
-                        logger.error(f"Scene segmentation failed: {e}")
-                        scene_segments = []
             except Exception as e:
-                logger.error(f"TTS audio generation failed: {e}")
+                logger.error(f"TTS audio generation failed: {e}", exc_info=True)
                 vsl_audio_url = ""
+
+            if not vsl_audio_url:
+                raise Exception("VSL audio generation failed; cannot continue to video assembly.")
+
+            # --- Step 2: Scene segmentation (with retries) ---
+            from app.services.scene_segmentation_service import scene_segmentation_service
+            import os
+            audio_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                vsl_audio_url.lstrip("/")
+            )
+            logger.info(f"Starting scene segmentation for: {audio_path}")
+
+            max_seg_attempts = 3
+            for seg_attempt in range(1, max_seg_attempts + 1):
+                try:
+                    scene_segments = await scene_segmentation_service.analyze_audio(audio_path)
+                    if scene_segments:
+                        logger.info(f"Generated {len(scene_segments)} scene segments (attempt {seg_attempt})")
+                        break
+                    logger.warning(f"Scene segmentation returned empty (attempt {seg_attempt}/{max_seg_attempts})")
+                except Exception as e:
+                    logger.error(f"Scene segmentation attempt {seg_attempt} failed: {e}", exc_info=True)
+                if seg_attempt < max_seg_attempts:
+                    await asyncio.sleep(5)
 
         if vsl_script and not vsl_audio_url:
             raise Exception("VSL audio generation failed; cannot continue to video assembly.")

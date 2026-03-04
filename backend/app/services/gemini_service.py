@@ -1,7 +1,8 @@
 import google.generativeai as genai
-from app.core.config import settings
+from app.core.key_manager import key_manager
 import logging
 import json
+import asyncio
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
@@ -17,37 +18,56 @@ def _clean_json(text: str) -> dict:
     return json.loads(text[start:end])
 
 
+def _build_model(api_key: str):
+    """Configure the old SDK and return a GenerativeModel for the given key."""
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        "gemini-2.5-flash",
+        generation_config={
+            "temperature": 0.6,
+            "top_p": 0.9,
+            "top_k": 40,
+            "max_output_tokens": 8192,
+        },
+    )
+
+
 class GeminiService:
     def __init__(self):
-        self.api_key = settings.GOOGLE_API_KEY
+        if not key_manager.has_keys:
+            logger.warning("No GOOGLE API keys configured. AI generation disabled.")
 
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
-
-            # Controlled generation for consistent persuasive output
-            self.model = genai.GenerativeModel(
-                "gemini-2.5-flash",
-                generation_config={
-                    "temperature": 0.6,   # balanced creativity & clarity
-                    "top_p": 0.9,
-                    "top_k": 40,
-                    "max_output_tokens": 8192,
-                },
-            )
-        else:
-            logger.warning("GOOGLE_API_KEY missing. AI generation disabled.")
-            self.model = None
+    def _get_model(self):
+        """Get a model configured with the current active API key."""
+        key = key_manager.get_key()
+        if not key:
+            return None, None
+        return _build_model(key), key
 
     async def generate_script(self, prompt: str) -> str:
-        if not self.model:
+        model, key = self._get_model()
+        if not model:
             logger.error("Attempted script generation without API key.")
             return "Error: GOOGLE_API_KEY not configured."
 
         try:
-            response = self.model.generate_content(prompt)
+            response = await asyncio.to_thread(model.generate_content, prompt)
             return response.text
         except Exception as e:
-            logger.error(f"Gemini API Error: {str(e)}")
+            if key_manager.is_quota_error(e):
+                key_manager.mark_exhausted(key)
+                # Retry with next key
+                model2, key2 = self._get_model()
+                if model2:
+                    try:
+                        response = await asyncio.to_thread(model2.generate_content, prompt)
+                        return response.text
+                    except Exception as e2:
+                        if key_manager.is_quota_error(e2):
+                            key_manager.mark_exhausted(key2)
+                        logger.error(f"Gemini API Error (retry): {e2}", exc_info=True)
+                        return f"Error generating script: {e2}"
+            logger.error(f"Gemini API Error: {str(e)}", exc_info=True)
             return f"Error generating script: {str(e)}"
 
     @lru_cache(maxsize=128)
@@ -89,10 +109,15 @@ IMPORTANT RULES:
 Keep it professional and persuasive.
 Return raw JSON only.
 """
+        model, key = self._get_model()
+        if not model:
+            return {}
         try:
-            response = self.model.generate_content(fallback_prompt)
+            response = await asyncio.to_thread(model.generate_content, fallback_prompt)
             return _clean_json(response.text)
         except Exception as e:
+            if key_manager.is_quota_error(e):
+                key_manager.mark_exhausted(key)
             logger.error(f"Fallback generation failed: {e}")
             return {}
 
@@ -107,7 +132,8 @@ Return raw JSON only.
         AI infers audience, positioning, persuasion, and aligns copy to the VSL message.
         """
 
-        if not self.model:
+        model, key = self._get_model()
+        if not model:
             return await self._generate_fallback_from_ai(promotion_offer, language)
 
         vsl_context = ""
@@ -184,27 +210,21 @@ Return raw JSON only.
         try:
             logger.info(f"Generating landing page content for: {promotion_offer}")
 
-            # retry logic
-            for attempt in range(2):
-                try:
-                    response = self.model.generate_content(prompt)
-                    result = _clean_json(response.text)
+            response = await asyncio.to_thread(model.generate_content, prompt)
+            result = _clean_json(response.text)
 
-                    # ensure schema completeness
-                    for key in required_keys:
-                        if key not in result:
-                            result[key] = [] if "signals" in key or "bullets" in key or "points" in key else ""
+            # ensure schema completeness
+            for rk in required_keys:
+                if rk not in result:
+                    result[rk] = [] if "signals" in rk or "bullets" in rk or "points" in rk else ""
 
-                    return result
-
-                except Exception as e:
-                    logger.warning(f"Attempt {attempt+1} failed: {e}")
-
-            return await self._generate_fallback_from_ai(promotion_offer, language)
+            return result
 
         except Exception as e:
-            logger.error(f"Primary generation failed: {e}")
-            return await self._generate_fallback_from_ai(promotion_offer, language)
+            if key_manager.is_quota_error(e):
+                key_manager.mark_exhausted(key)
+            logger.error(f"Landing page generation failed: {e}")
+            return {}
 
     async def generate_viral_script(self, keyword: str) -> str:
         prompt = f"""
@@ -253,4 +273,3 @@ Hard rules:
 
 
 gemini_service = GeminiService()
-

@@ -1,9 +1,21 @@
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.api.v1.api import api_router
+
+# Configure logging to file for debugging
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, mode="w", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
 
 app = FastAPI(title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json")
 
