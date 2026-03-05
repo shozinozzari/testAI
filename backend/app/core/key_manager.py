@@ -31,10 +31,12 @@ class KeyManager:
 
         # Track exhausted keys: key_index -> timestamp when it was marked exhausted
         self._exhausted: dict[int, float] = {}
+        # Permanently invalid keys (expired, revoked, etc.)
+        self._invalid: set[int] = set()
         # Cooldown period: how long (seconds) before retrying an exhausted key
         self._cooldown = 65  # slightly over 1 min (Google's per-minute window)
         self._current_index = 0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
         if self._keys:
             logger.info(f"🔑 KeyManager initialised with {len(self._keys)} API key(s)")
@@ -62,7 +64,7 @@ class KeyManager:
             self._refresh_exhausted()
             # Try to find a non-exhausted key starting from current index
             for _ in range(len(self._keys)):
-                if self._current_index not in self._exhausted:
+                if self._current_index not in self._exhausted and self._current_index not in self._invalid:
                     key = self._keys[self._current_index]
                     return key
                 self._current_index = (self._current_index + 1) % len(self._keys)
@@ -91,6 +93,24 @@ class KeyManager:
             else:
                 logger.warning("🔑 No more available keys after rotation.")
 
+    def mark_invalid(self, key: str):
+        """Mark a key as permanently invalid and rotate to the next one."""
+        with self._lock:
+            try:
+                idx = self._keys.index(key)
+            except ValueError:
+                return
+            self._invalid.add(idx)
+            masked = f"{key[:8]}...{key[-4:]}"
+            logger.error(f"🔑 Key {masked} marked invalid/expired and removed from rotation.")
+            self._current_index = (idx + 1) % len(self._keys)
+            next_key = self.get_key()
+            if next_key:
+                next_masked = f"{next_key[:8]}...{next_key[-4:]}"
+                logger.info(f"🔑 Switched to key {next_masked}")
+            else:
+                logger.warning("🔑 No more valid API keys available.")
+
     def _refresh_exhausted(self):
         """Remove keys from the exhausted set if cooldown has elapsed."""
         now = time.time()
@@ -104,6 +124,20 @@ class KeyManager:
         """Check if an exception is a 429 / quota error."""
         err_str = str(error)
         return "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower()
+
+    def is_invalid_key_error(self, error) -> bool:
+        """Check if an exception is due to invalid/expired credentials."""
+        err_str = str(error).lower()
+        markers = [
+            "api_key_invalid",
+            "api key expired",
+            "invalid api key",
+            "api key not valid",
+            "permission_denied",
+            "401",
+            "403",
+        ]
+        return any(marker in err_str for marker in markers)
 
 
 # Singleton

@@ -54,8 +54,11 @@ class GeminiService:
             response = await asyncio.to_thread(model.generate_content, prompt)
             return response.text
         except Exception as e:
-            if key_manager.is_quota_error(e):
-                key_manager.mark_exhausted(key)
+            if key_manager.is_quota_error(e) or key_manager.is_invalid_key_error(e):
+                if key_manager.is_quota_error(e):
+                    key_manager.mark_exhausted(key)
+                else:
+                    key_manager.mark_invalid(key)
                 # Retry with next key
                 model2, key2 = self._get_model()
                 if model2:
@@ -65,6 +68,8 @@ class GeminiService:
                     except Exception as e2:
                         if key_manager.is_quota_error(e2):
                             key_manager.mark_exhausted(key2)
+                        elif key_manager.is_invalid_key_error(e2):
+                            key_manager.mark_invalid(key2)
                         logger.error(f"Gemini API Error (retry): {e2}", exc_info=True)
                         return f"Error generating script: {e2}"
             logger.error(f"Gemini API Error: {str(e)}", exc_info=True)
@@ -118,6 +123,8 @@ Return raw JSON only.
         except Exception as e:
             if key_manager.is_quota_error(e):
                 key_manager.mark_exhausted(key)
+            elif key_manager.is_invalid_key_error(e):
+                key_manager.mark_invalid(key)
             logger.error(f"Fallback generation failed: {e}")
             return {}
 
@@ -223,6 +230,8 @@ Return raw JSON only.
         except Exception as e:
             if key_manager.is_quota_error(e):
                 key_manager.mark_exhausted(key)
+            elif key_manager.is_invalid_key_error(e):
+                key_manager.mark_invalid(key)
             logger.error(f"Landing page generation failed: {e}")
             return {}
 

@@ -51,7 +51,9 @@ class CampaignInDB(CampaignBase):
     id: str
     owner_id: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    is_active: bool = True
+    is_active: bool = False
+    status: str = "processing"
+    error_message: Optional[str] = None
     
     # Phase 9: WhatsApp Round Robin
     whatsapp_config: Optional[WhatsAppConfig] = None

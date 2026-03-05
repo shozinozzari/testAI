@@ -36,6 +36,15 @@ export default function DashboardPage() {
 
     useEffect(() => { fetchCampaigns(); }, [authUser]);
 
+    // Poll if any campaign is processing
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (campaigns.some(c => c.status === 'processing')) {
+            interval = setInterval(fetchCampaigns, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [campaigns]);
+
     // Close menu on outside click
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -129,10 +138,24 @@ export default function DashboardPage() {
                                                     }`}></span>
                                                 {camp.is_active !== false ? "Active" : "Paused"}
                                             </span>
+                                            {camp.status && camp.status !== 'completed' && (
+                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider shrink-0 ${
+                                                    camp.status === 'processing' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                                                    camp.status === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : ''
+                                                }`}>
+                                                    {camp.status === 'processing' && (
+                                                        <svg className="animate-spin inline-block w-3 h-3 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                    )}
+                                                    {camp.status === 'processing' ? 'Generating...' : camp.status}
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-sm text-gray-400">
                                             Objective: {camp.cta_option || "—"} • Socials: {(camp.connected_socials || []).length}
                                         </p>
+                                        {camp.status === 'error' && camp.error_message && (
+                                            <p className="text-xs text-red-400 mt-1 line-clamp-2" title={camp.error_message}>{camp.error_message}</p>
+                                        )}
 
                                         {/* Landing Page Details */}
                                         {camp.cta_option === 'CALL_BOOKING' && (

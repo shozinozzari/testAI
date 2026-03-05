@@ -123,6 +123,10 @@ class AudioService:
                             key_manager.mark_exhausted(key)
                             logger.warning(f"  Chunk {i+1}: Key exhausted, rotating... (attempt {attempt+1})")
                             continue  # Try next key
+                        if key_manager.is_invalid_key_error(chunk_err):
+                            key_manager.mark_invalid(key)
+                            logger.warning(f"  Chunk {i+1}: Key invalid/expired, rotating... (attempt {attempt+1})")
+                            continue  # Try next key
                         else:
                             raise  # Non-quota error, bubble up
                 else:

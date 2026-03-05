@@ -59,6 +59,10 @@ class SceneSegmentationService:
                     key_manager.mark_exhausted(key)
                     logger.warning(f"Scene segmentation: key exhausted, rotating... (attempt {attempt+1})")
                     continue
+                elif key_manager.is_invalid_key_error(e):
+                    key_manager.mark_invalid(key)
+                    logger.warning(f"Scene segmentation: key invalid/expired, rotating... (attempt {attempt+1})")
+                    continue
                 else:
                     logger.error(f"Scene segmentation error: {e}", exc_info=True)
                     return []

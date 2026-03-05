@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List
 from app.models.campaign import CampaignCreate, CampaignInDB
 from app.services.campaign_service import campaign_service
@@ -19,14 +19,14 @@ async def list_campaigns(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=CampaignInDB)
-async def create_campaign(campaign_in: CampaignCreate, current_user: dict = Depends(get_current_user)):
+async def create_campaign(campaign_in: CampaignCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     """
     Create a new campaign.
     """
     user_id = current_user['uid']
     
     try:
-        return await campaign_service.create_campaign(user_id, campaign_in)
+        return await campaign_service.create_campaign(user_id, campaign_in, background_tasks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -1,11 +1,14 @@
 from app.models.campaign import CampaignCreate, CampaignInDB, CTAOption
 from app.services.firebase_service import firebase_service
 from firebase_admin import firestore
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CampaignService:
-    async def create_campaign(self, user_id: str, campaign_in: CampaignCreate):
+    async def create_campaign(self, user_id: str, campaign_in: CampaignCreate, background_tasks: BackgroundTasks = None):
         """
         Creates a new campaign with ownership enforcement.
         """
@@ -28,18 +31,36 @@ class CampaignService:
         campaign_data = CampaignInDB(
             id=campaign_id,
             owner_id=user_id,
+            status="processing",
             **campaign_in.dict()
         )
         
         db.collection("campaigns").document(campaign_id).set(campaign_data.dict())
         
-        # 4. Link to User
+        # Link to User
         user_ref.update({"campaign_ids": firestore.ArrayUnion([campaign_id])})
         
-        # Generate landing page content + VSL script + TTS audio for all campaign types
-        from app.services.landing_page_service import landing_page_service
-        # Wait for generation to complete (synchronous for better UX feedback)
-        await landing_page_service.generate_landing_page(campaign_id)
+        async def run_generation(cid: str):
+            from app.services.landing_page_service import landing_page_service
+            try:
+                await landing_page_service.generate_landing_page(cid)
+                db.collection("campaigns").document(cid).update({
+                    "status": "completed",
+                    "is_active": True,
+                    "error_message": None
+                })
+            except Exception as e:
+                logger.error(f"Background generation failed for campaign {cid}: {e}")
+                db.collection("campaigns").document(cid).update({
+                    "status": "error",
+                    "error_message": str(e)
+                })
+
+        if background_tasks:
+            background_tasks.add_task(run_generation, campaign_id)
+        else:
+            import asyncio
+            asyncio.create_task(run_generation(campaign_id))
 
         return campaign_data
 
