@@ -21,6 +21,8 @@ class VideoService:
         self.video_root = self.static_root / "video"
         self.video_root.mkdir(parents=True, exist_ok=True)
         self.scene_playback_speed = 1.30
+        # Background music preset
+        self.bg_music_path = self.backend_root / "VSL Music.mp3"
 
     async def assemble_vsl(
         self,
@@ -109,26 +111,77 @@ class VideoService:
                 cwd=temp_dir,
             )
 
+            # ── Step 2: Mux visual track + narration (no music yet) ──
+            narrated_path = temp_dir / "narrated.mp4"
             await self._run_ffmpeg(
                 [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    str(visual_track_path),
-                    "-i",
-                    str(audio_path),
-                    "-c:v",
-                    "copy",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "192k",
+                    "ffmpeg", "-y",
+                    "-i", str(visual_track_path),
+                    "-i", str(audio_path),
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
                     "-shortest",
-                    "-movflags",
-                    "+faststart",
-                    str(output_path),
+                    str(narrated_path),
                 ]
             )
+
+            # ── Step 3: Speed up the narrated video by 1.20x ──
+            vsl_speed = 1.20
+            sped_up_path = temp_dir / "sped_up.mp4"
+            logger.info("Speeding up VSL by %.2fx", vsl_speed)
+            # atempo only accepts 0.5–100, setpts accepts any positive value
+            await self._run_ffmpeg(
+                [
+                    "ffmpeg", "-y",
+                    "-i", str(narrated_path),
+                    "-filter_complex",
+                    f"[0:v]setpts=PTS/{vsl_speed}[v];[0:a]atempo={vsl_speed}[a]",
+                    "-map", "[v]",
+                    "-map", "[a]",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-crf", "23",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    str(sped_up_path),
+                ]
+            )
+
+            # ── Step 4: Mix in background music at full volume ──
+            if self.bg_music_path.exists():
+                logger.info("Mixing background music: %s", self.bg_music_path)
+                await self._run_ffmpeg(
+                    [
+                        "ffmpeg", "-y",
+                        "-i", str(sped_up_path),             # input 0: sped-up video+narration
+                        "-stream_loop", "-1",
+                        "-i", str(self.bg_music_path),       # input 1: music (looped)
+                        "-filter_complex",
+                        "[0:a][1:a]amix=inputs=2:duration=shortest:dropout_transition=2[aout]",
+                        "-map", "0:v",
+                        "-map", "[aout]",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        "-shortest",
+                        "-movflags", "+faststart",
+                        str(output_path),
+                    ]
+                )
+            else:
+                logger.warning("Background music not found at %s — narration only", self.bg_music_path)
+                await self._run_ffmpeg(
+                    [
+                        "ffmpeg", "-y",
+                        "-i", str(sped_up_path),
+                        "-c:v", "copy",
+                        "-c:a", "copy",
+                        "-movflags", "+faststart",
+                        str(output_path),
+                    ]
+                )
 
             logger.info("VSL video assembled: %s", output_path)
             return f"/static/video/{output_name}"
