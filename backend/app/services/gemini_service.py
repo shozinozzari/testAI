@@ -250,33 +250,53 @@ Return only the script.
 
     async def generate_vsl_script(self, promotion_offer: str, language: str = "English") -> str:
         prompt = f"""
-Act as an elite direct-response VSL copywriter.
-TARGET LANGUAGE: Colloquial {language}.
+You are an elite direct-response VSL copywriter who writes the way real people TALK — not the way marketers write.
+TARGET LANGUAGE: Colloquial, street-level {language} — the way a sharp friend would explain something on a voice note.
 
 Goal:
-Maximize booked strategy calls from qualified prospects.
+Get qualified prospects to book a strategy call RIGHT NOW.
 
 Offer:
 "{promotion_offer}"
 
-Required conversion structure (do NOT label sections):
-1) Hook: pattern interrupt + specific promised outcome.
-2) Problem agitation: vivid daily pains and cost of inaction.
-3) Root-cause insight: why old attempts fail.
-4) Offer mechanism: why this approach is different.
-5) Proof framing: concrete, believable indicators (no fabricated stats or fake claims).
-6) Objection handling: time, money, trust, and complexity.
-7) CTA: one clear next step to book now, naturally repeated 2-3 times.
+## VOICE & TONE — THIS IS CRITICAL
 
-Hard rules:
-- LANGUAGE: Entire script must be in Colloquial {language}. Avoid English unless a term is commonly used in that language.
-- Plain text only for TTS. No markdown, no section headers, no bullet points, no stage directions.
-- Write short spoken paragraphs (1-3 sentences each) for natural voiceover pacing.
-- Use strong "you" language and specific real-world scenarios.
-- Add urgency/scarcity without fake claims.
-- Include one soft disqualifier line for poor-fit viewers.
-- Avoid vague hype words: "revolutionary", "game-changing", "best ever", "guaranteed".
-- Keep runtime roughly 90-150 seconds when spoken aloud.
+Write like a real human having an honest, slightly intense conversation.
+- Use contractions, run-on thoughts, rhetorical questions, and everyday slang.
+- Short punchy sentences. Some fragments. Then a longer one to drive the point home.
+- Speak directly: "you", "your", "look", "here's the thing", "let me be real with you".
+- Add natural filler sparingly for realism: "honestly", "look", "the thing is", "right?", "I mean".
+- Vary rhythm: fast-fast-fast then slow. Build tension, then release.
+- Sound like a mentor who's been through it, not a teleprompter reading a pitch deck.
+
+## TECHNICAL / ENGLISH TERMS — KEEP IN ENGLISH
+
+Even when writing in {language}, keep these types of words in English (they're universally understood):
+- Business/marketing terms: ROI, leads, funnel, ads, CRM, pipeline, conversion, landing page, scaling, revenue, profit, B2B, SaaS, agency, retainer, clients, niche, offer, strategy call, onboarding, KPIs, ROAS, CPL, CPC, CTR, follow-up, close rate, upsell, churn
+- Tech terms: AI, automation, dashboard, analytics, API, CRM, software, platform, tool, system, app, workflow, integration
+- Social/brand terms: Instagram, YouTube, Facebook, Google, WhatsApp, LinkedIn, Zoom, Meta
+- Common English phrases that feel natural in any language: "game plan", "next level", "no-brainer", "real talk", "step by step", "done-for-you", "plug and play"
+
+## CONVERSION STRUCTURE (flow naturally — do NOT label sections)
+
+1) HOOK (first 5-10 seconds): Pattern interrupt. Say something unexpected or contrarian that stops the scroll. State the specific outcome they'll get.
+2) PROBLEM AGITATION: Paint their daily pain vividly — the late nights, the wasted ad spend, the ghosted proposals, the feast-or-famine cycle. Make them feel SEEN.
+3) ROOT CAUSE: Explain why everything they've tried before didn't work. Be specific — not "you lacked a system" but name the actual broken approach.
+4) THE MECHANISM: Reveal your different approach. Explain the "how" at a high level — enough to build belief, not so much it overwhelms.
+5) PROOF FRAMING: Use believable, concrete indicators. Real-world scenarios, relatable before/after situations. NO fabricated stats, fake case studies, or made-up numbers.
+6) OBJECTION HANDLING: Address the "yeah but..." thoughts — time, money, trust, complexity. Handle each one with empathy + logic.
+7) CTA: One clear next step — book the call. Weave it in naturally 2-3 times (not copy-pasted, each time phrased slightly differently).
+
+## HARD RULES
+
+- LANGUAGE: Entire script in Colloquial {language}. But keep technical/business/platform terms in English as listed above.
+- Plain text ONLY for TTS. No markdown, no headers, no bullets, no emojis, no stage directions, no [brackets].
+- Write short spoken paragraphs (1-3 sentences). One thought per paragraph. Let the listener breathe.
+- Every paragraph should feel like it could be a voice note — if it sounds "written", rewrite it.
+- Include one soft disqualifier: "If you're not willing to [X], this isn't for you."
+- FORBIDDEN words/phrases: "revolutionary", "game-changing", "best ever", "guaranteed results", "secret", "hack", "passive income", "financial freedom", "unlimited".
+- Runtime: roughly 90-150 seconds when spoken aloud at natural pace.
+- End with a single clear CTA — not a summary, not a recap. Just tell them what to do next.
 """
         return await self.generate_script(prompt)
 
