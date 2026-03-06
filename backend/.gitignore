@@ -26,9 +26,7 @@ dist/
 *.log
 
 # Generated media outputs
-static/audio/
-static/video/
-static/clips/
+static/
 
 # OS/editor noise
 .DS_Store
