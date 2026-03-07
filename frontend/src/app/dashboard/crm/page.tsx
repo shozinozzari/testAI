@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = [
     { key: "NEW", label: "New", color: "bg-blue-500", dot: "bg-blue-400" },
+    { key: "NA", label: "N/A", color: "bg-gray-800", dot: "bg-gray-700" },
     { key: "CALLED", label: "Called", color: "bg-amber-500", dot: "bg-amber-400" },
     { key: "TEXTED", label: "Texted", color: "bg-cyan-500", dot: "bg-cyan-400" },
     { key: "DISQUALIFIED", label: "No", color: "bg-gray-500", dot: "bg-gray-400" },
@@ -245,7 +246,7 @@ export default function CRMPage() {
                 {loading ? (
                     <div className="text-center text-gray-400 py-20 text-sm">Loading leads...</div>
                 ) : (
-                    <div className="grid grid-cols-7 gap-1.5" style={{ minHeight: "calc(100vh - 200px)" }}>
+                    <div className="grid grid-cols-8 gap-1.5" style={{ minHeight: "calc(100vh - 200px)" }}>
                         {STATUSES.map(col => {
                             const colLeads = getLeadsByStatus(col.key);
                             return (

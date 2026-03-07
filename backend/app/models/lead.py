@@ -6,6 +6,7 @@ from datetime import datetime
 
 class LeadStatus(str, Enum):
     NEW = "NEW"
+    NA = "NA"
     TEXTED = "TEXTED"
     CALLED = "CALLED"
     DISQUALIFIED = "DISQUALIFIED"
