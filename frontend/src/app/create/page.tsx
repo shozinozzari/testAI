@@ -534,10 +534,10 @@ export default function OnboardingPage() {
                     {step === 1 && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-semibold">Campaign Details</h2>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Business Name</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">Campaign Name</label>
                             <input
                                 type="text"
-                                placeholder="Business Name"
+                                placeholder="Campaign Name"
                                 className="w-full bg-black border border-white/20 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
                                 value={formData.businessName}
                                 onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
