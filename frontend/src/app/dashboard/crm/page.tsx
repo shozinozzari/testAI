@@ -6,11 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = [
     { key: "NEW", label: "New", color: "bg-blue-500", dot: "bg-blue-400" },
-    { key: "NA", label: "N/A", color: "bg-gray-800", dot: "bg-gray-700" },
+    { key: "NA", label: "NA", color: "bg-gray-800", dot: "bg-gray-700" },
     { key: "CALLED", label: "Called", color: "bg-amber-500", dot: "bg-amber-400" },
     { key: "TEXTED", label: "Texted", color: "bg-cyan-500", dot: "bg-cyan-400" },
-    { key: "DISQUALIFIED", label: "No", color: "bg-gray-500", dot: "bg-gray-400" },
-    { key: "QUALIFIED", label: "Yes", color: "bg-purple-500", dot: "bg-purple-400" },
+    { key: "DISQUALIFIED", label: "Disqualified", color: "bg-gray-500", dot: "bg-gray-400" },
+    { key: "QUALIFIED", label: "Qualified", color: "bg-purple-500", dot: "bg-purple-400" },
     { key: "CONVERTED", label: "Converted", color: "bg-emerald-500", dot: "bg-emerald-400" },
     { key: "LOST", label: "Lost", color: "bg-red-500", dot: "bg-red-400" },
 ];
