@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Sidebar from "@/components/Sidebar";
 import { useAuth } from "@/context/AuthContext";
 
 const COUNTRIES = [
@@ -252,19 +253,23 @@ export default function UsersPage() {
     };
 
     return (
-        <div className="p-6 text-white max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">User Management</h1>
-                    <p className="text-gray-400 mt-1">Manage team access and roles</p>
-                </div>
-                <button
-                    onClick={openAddModal}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl transition shadow-lg shadow-purple-500/20 font-medium flex items-center gap-2"
-                >
-                    <span>+ Add New User</span>
-                </button>
-            </div>
+        <div className="min-h-screen bg-black text-white flex">
+            <Sidebar />
+            
+            <main className="flex-1 md:ml-64 p-6 md:p-10 transition-all duration-300">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">User Management</h1>
+                            <p className="text-gray-400 mt-1">Manage team access and roles</p>
+                        </div>
+                        <button
+                            onClick={openAddModal}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl transition shadow-lg shadow-purple-500/20 font-medium flex items-center gap-2"
+                        >
+                            <span>+ Add New User</span>
+                        </button>
+                    </div>
 
             <div className="bg-zinc-900 border border-white/10 rounded-xl overflow-hidden shadow-xl">
                 {loading ? (
@@ -476,6 +481,8 @@ export default function UsersPage() {
                     </div>
                 </div>
             )}
+                </div>
+            </main>
         </div>
     );
 }

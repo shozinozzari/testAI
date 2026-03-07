@@ -543,10 +543,9 @@ export default function OnboardingPage() {
                                 onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
                             />
                             <label className="block text-sm font-medium text-gray-300 mb-1">What do you want to promote?</label>
-                            <input
-                                type="text"
+                            <textarea
                                 placeholder="Your product name or service name"
-                                className="w-full bg-black border border-white/20 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                                className="w-full bg-black border border-white/20 rounded-lg p-3 text-white focus:border-purple-500 outline-none resize-vertical min-h-[100px]"
                                 value={formData.businessDescription}
                                 onChange={(e) => setFormData({ ...formData, businessDescription: e.target.value })}
                             />
